@@ -264,6 +264,11 @@
         let globalOrdersCache = []; 
         let editingName = null;     
 
+        // 輔助工具：產生每筆餐點唯一的識別 ID，確保多裝置不會互相覆蓋
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        }
+
         // --- 1. 即時監聽主頁面 ---
         onSnapshot(collection(db, "groups"), (snapshot) => {
             const grid = document.getElementById('group-grid');
@@ -348,21 +353,23 @@
             document.getElementById('order-modal').classList.remove('active'); 
             resetOrderModalRows(); 
         }
-        window.addNewItemRow = function() {
+        window.addNewItemRow = function(name = '', price = '', qty = 1, itemHash = '') {
             const container = document.getElementById('dynamic-items-container');
             const newRow = document.createElement('div');
             newRow.className = 'item-input-row';
+            // 將內建的項目雜湊（Hash）悄悄綁定在欄位資料屬性上，用於精確的多裝置修改識別
+            newRow.setAttribute('data-item-hash', itemHash || generateUniqueId());
             newRow.innerHTML = `
-                <input type="text" class="input-item-name" placeholder="品項名稱">
-                <input type="number" class="input-item-price" placeholder="單價">
-                <input type="number" class="input-item-qty" value="1" min="1" placeholder="數量">
+                <input type="text" class="input-item-name" value="${name}" placeholder="品項名稱">
+                <input type="number" class="input-item-price" value="${price}" placeholder="單價">
+                <input type="number" class="input-item-qty" value="${qty}" min="1" placeholder="數量">
             `;
             container.appendChild(newRow);
         }
         function resetOrderModalRows() {
             document.getElementById('order-name').value = '';
             document.getElementById('dynamic-items-container').innerHTML = `
-                <div class="item-input-row">
+                <div class="item-input-row" data-item-hash="${generateUniqueId()}">
                     <input type="text" class="input-item-name" placeholder="如：大杯珍奶">
                     <input type="number" class="input-item-price" placeholder="單價">
                     <input type="number" class="input-item-qty" value="1" min="1" placeholder="數量">
@@ -374,20 +381,19 @@
             let name = document.getElementById('order-name').value.trim();
             if(!name) { alert("請輸入你的名字！"); return; }
 
-            const itemNames = document.querySelectorAll('.input-item-name');
-            const itemPrices = document.querySelectorAll('.input-item-price');
-            const itemQtys = document.querySelectorAll('.input-item-qty');
-
+            const rows = document.querySelectorAll('#dynamic-items-container .item-input-row');
             let validOrders = [];
-            for(let i = 0; i < itemNames.length; i++) {
-                let item = itemNames[i].value.trim();
-                let price = parseInt(itemPrices[i].value);
-                let qty = parseInt(itemQtys[i].value) || 1;
+
+            rows.forEach(row => {
+                let item = row.querySelector('.input-item-name').value.trim();
+                let price = parseInt(row.querySelector('.input-item-price').value);
+                let qty = parseInt(row.querySelector('.input-item-qty').value) || 1;
+                let itemHash = row.getAttribute('data-item-hash') || generateUniqueId();
 
                 if (item && !isNaN(price)) {
-                    validOrders.push({ name, item, qty, price: price, paid: false });
+                    validOrders.push({ name, item, qty, price: price, paid: false, itemHash: itemHash });
                 }
-            }
+            });
 
             if(validOrders.length === 0) { alert("請至少正確填寫一組品項與單價喔！"); return; }
             closeOrderModal();
@@ -409,54 +415,60 @@
             container.innerHTML = ''; 
 
             userOrders.forEach(o => {
-                const row = document.createElement('div');
-                row.className = 'item-input-row';
-                row.innerHTML = `
-                    <input type="text" class="input-item-name" value="${o.item}" placeholder="品項名稱">
-                    <input type="number" class="input-item-price" value="${o.price}" placeholder="單價">
-                    <input type="number" class="input-item-qty" value="${o.qty}" min="1" placeholder="數量">
-                `;
-                container.appendChild(row);
+                // 如果舊資料內沒有 itemHash，現場補發一組確保相容性
+                let currentHash = o.itemHash || generateUniqueId();
+                window.addNewItemRow(o.item, o.price, o.qty, currentHash);
             });
 
             document.getElementById('btn-order-submit').setAttribute("onclick", "submitEditOrder()");
             document.getElementById('order-modal').classList.add('active');
         }
 
+        // 👑 核心不衝突多裝置並行更新控制：不整批盲目刪除，精確比對 itemHash 來定點操作
         window.submitEditOrder = async function() {
-            const itemNames = document.querySelectorAll('.input-item-name');
-            const itemPrices = document.querySelectorAll('.input-item-price');
-            const itemQtys = document.querySelectorAll('.input-item-qty');
+            const rows = document.querySelectorAll('#dynamic-items-container .item-input-row');
+            let currentInputItems = [];
 
-            let newItems = [];
-            for(let i = 0; i < itemNames.length; i++) {
-                let item = itemNames[i].value.trim();
-                let price = parseInt(itemPrices[i].value);
-                let qty = parseInt(itemQtys[i].value) || 1;
+            rows.forEach(row => {
+                let item = row.querySelector('.input-item-name').value.trim();
+                let price = parseInt(row.querySelector('.input-item-price').value);
+                let qty = parseInt(row.querySelector('.input-item-qty').value) || 1;
+                let itemHash = row.getAttribute('data-item-hash');
 
                 if (item && !isNaN(price)) {
-                    newItems.push({ name: editingName, item, qty, price: price, paid: false });
+                    currentInputItems.push({ name: editingName, item, qty, price, paid: false, itemHash });
                 }
-            }
+            });
 
-            if(newItems.length === 0) { alert("請至少保留一組有效的品項與單價喔！"); return; }
+            if(currentInputItems.length === 0) { alert("請至少保留一組有效的品項與單價喔！"); return; }
             closeOrderModal();
 
-            const oldUserOrders = globalOrdersCache.filter(o => o.name === editingName);
+            // 從快照獲取此團員此時資料庫裡真實存在的舊數據
+            const dbOldUserOrders = globalOrdersCache.filter(o => o.name === editingName);
             const promises = [];
 
-            for (let i = 0; i < Math.max(oldUserOrders.length, newItems.length); i++) {
-                if (i < oldUserOrders.length && i < newItems.length) {
-                    const docRef = doc(db, "groups", currentGroupId, "orders", oldUserOrders[i].id);
-                    promises.push(updateDoc(docRef, newItems[i]));
-                } else if (i < newItems.length) {
+            // 1. 定點更新或新增：使用者畫面上有的
+            currentInputItems.forEach(inputItem => {
+                let matchedDbRecord = dbOldUserOrders.find(dbO => dbO.itemHash === inputItem.itemHash);
+                if (matchedDbRecord) {
+                    // 如果在資料庫有找到一樣的 itemHash，直接進行微幅更新（不會影響他人寫入的條目）
+                    const docRef = doc(db, "groups", currentGroupId, "orders", matchedDbRecord.id);
+                    promises.push(updateDoc(docRef, inputItem));
+                } else {
+                    // 如果是完全全新的 itemHash，代表是後來新增的那一行，直接追加
                     const colRef = collection(db, "groups", currentGroupId, "orders");
-                    promises.push(addDoc(colRef, newItems[i]));
-                } else if (i < oldUserOrders.length) {
-                    const docRef = doc(db, "groups", currentGroupId, "orders", oldUserOrders[i].id);
+                    promises.push(addDoc(colRef, inputItem));
+                }
+            });
+
+            // 2. 定點刪除：使用者在畫面上已經刪掉、但資料庫有的項目
+            dbOldUserOrders.forEach(dbItem => {
+                let stillExists = currentInputItems.some(inputItem => inputItem.itemHash === dbItem.itemHash);
+                if (!stillExists) {
+                    const docRef = doc(db, "groups", currentGroupId, "orders", dbItem.id);
                     promises.push(deleteDoc(docRef));
                 }
-            }
+            });
 
             await Promise.all(promises);
             resetOrderModalRows();
@@ -464,6 +476,7 @@
 
         window.deleteUserWholeOrder = async function(name) {
             if (confirm(`確定要刪除「${name}」的所有登記品項嗎？`)) {
+                // 精確抓出當下快照中屬於該用戶的品項獨立刪除
                 const userOrders = globalOrdersCache.filter(o => o.name === name);
                 const deletePromises = userOrders.map(o => deleteDoc(doc(db, "groups", currentGroupId, "orders", o.id)));
                 await Promise.all(deletePromises);
@@ -523,7 +536,7 @@
             // 👑 核心優化演算法：計算「跨品項全團倍數自動疊加」買 X 送 Y
             let isBuyXPromoTriggered = false;
             let totalFreeValueToDistribute = 0; 
-            let totalFreeQty = 0; // 全團被免單的總件數
+            let totalFreeQty = 0; 
 
             let buyX = parseInt(document.getElementById('promo-buy-x').value);
             let giveY = parseInt(document.getElementById('promo-give-y').value);
@@ -531,14 +544,11 @@
             if(buyxBadge) buyxBadge.innerHTML = '';
 
             if (currentPromoMode === 'buyx' && !isNaN(buyX) && buyX > 0 && !isNaN(giveY) && giveY > 0) {
-                // 🎯 採用直覺的「每滿 X 件就送 Y 件」倍數計算法。
-                // 範例：買 6 送 1。全團買 12 件時，Math.floor(12 / 6) = 2。2 * 1 = 完整免單 2 件！
                 let multiplier = Math.floor(totalQty / buyX); 
                 totalFreeQty = multiplier * giveY;
 
                 if (totalFreeQty > 0) {
                     isBuyXPromoTriggered = true;
-                    // 以全團的加權平均單價來精確換算總共要折掉的「免單總金額」
                     let averageUnitPrice = rawTotalMoney / totalQty;
                     totalFreeValueToDistribute = totalFreeQty * averageUnitPrice;
 
@@ -579,7 +589,7 @@
             let finalGlobalTotalMoney = rawTotalMoney; 
 
             if (currentPromoMode === 'buyx' && isBuyXPromoTriggered && totalQty > 0) {
-                // 【全團混湊倍數模式：按每個人買的「總件數比例」扣減免單金額池】
+                // 【全團混湊倍數模式】
                 finalGlobalTotalMoney = Math.max(0, rawTotalMoney - totalFreeValueToDistribute);
                 Object.keys(mergedData).forEach(name => {
                     let user = mergedData[name];
@@ -636,7 +646,7 @@
                 });
             }
 
-            // 💡 尾差校正器：百分之百消滅因四捨五入產生的 ±1 元誤差
+            // 💡 尾差校正器
             let checkSum = 0;
             Object.keys(mergedData).forEach(name => { checkSum += mergedData[name].finalPrice; });
             let diff = Math.round(finalGlobalTotalMoney) - checkSum;
