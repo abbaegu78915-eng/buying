@@ -3,108 +3,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>即時同步團購系統</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>🛒 團購與代購小助手 - 雲端即時版</title>
     <style>
-        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+        :root {
+            --primary: #4f46e5;
+            --success: #2ed573;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --gray: #747d8c;
+            --bg: #f1f5f9;
+        }
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #2f3542; }
+        .page { display: none; max-width: 900px; margin: 0 auto; }
+        .page.active { display: block; }
+
+        /* 頂部導覽 */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        h2 { margin: 0; font-size: 24px; }
+        button { border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: bold; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-add { background-color: var(--success); color: white; }
+        .btn-back { background-color: var(--gray); color: white; }
+
+        /* 頁面分頁標籤 (Tabs) */
+        .tab-container { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .tab { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; background: #e2e8f0; color: #57606f; }
+        .tab.active { background: var(--primary); color: white; }
+
+        /* 資訊區塊 */
+        .info-box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .link-tag { display: inline-block; background: #eff6ff; color: var(--primary); padding: 4px 8px; border-radius: 4px; font-size: 12px; text-decoration: none; margin-top: 5px; }
+        .plus-floating-btn { display: block; width: 100%; background: var(--primary); color: white; padding: 15px; font-size: 18px; border-radius: 12px; margin-bottom: 25px; }
+
+        /* 主頁面卡片網格 */
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+        .group-card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; border: 1px solid transparent; }
+        .group-card:hover { transform: translateY(-4px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
+        .group-card h3 { margin: 0 0 10px 0; color: #1e293b; padding-right: 35px; }
+        .group-card p { margin: 5px 0; color: #64748b; font-size: 14px; }
+        
+        .btn-delete-card { position: absolute; top: 15px; right: 15px; background: #ffeaa7; border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-delete-card:hover { background: var(--danger); }
+
+        /* 彈出視窗 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: white; padding: 30px; border-radius: 16px; width: 95%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
+        .modal-content h3 { margin-top: 0; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 10px 0 14px 0; border: 2px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 15px; background: white; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+        .btn-cancel { background: #e2e8f0; color: #475569; }
+
+        /* 🎯 促銷控制台 */
+        .discount-control-box { background: #fffbeb; border: 2px solid #fde68a; padding: 18px; border-radius: 14px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(245,158,11,0.05); }
+        .discount-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+        .discount-row select { width: auto; margin: 0; padding: 10px 16px; border: 2px solid #f59e0b; font-weight: bold; color: #b45309; }
+        .promo-input-group { display: none; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 8px; border: 2px solid #cbd5e1; }
+        .promo-input-group.active { display: flex; }
+        .promo-input-group input { width: 85px; margin: 0; padding: 6px; text-align: center; border: 1px solid #cbd5e1; font-weight: bold; color: #4f46e5; }
+
+        /* 動態欄位組合 */
+        .item-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 5px; }
+        .item-input-row input.input-item-name { flex: 2.5; margin-bottom: 10px; }
+        .item-input-row input.input-item-price { flex: 1.2; margin-bottom: 10px; }
+        .item-input-row input.input-item-qty { flex: 1; margin-bottom: 10px; text-align: center; }
+        .btn-more-item { background: #e0e7ff; color: var(--primary); width: 100%; padding: 10px; border-radius: 8px; font-size: 14px; margin-top: 5px; }
+
+        /* 內頁小盒子樣式 */
+        .sub-page { display: none; }
+        .sub-page.active { display: block; }
+        .summary-box { background: #eef2f6; border-left: 6px solid var(--primary); padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; }
+        .summary-item { font-size: 16px; margin: 6px 0; color: #1e293b; }
+        .stats-banner { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-around; font-size: 18px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .total-money { color: var(--danger); }
+        
+        /* 團員名單卡片樣式 */
+        .user-order-card { background: white; border: 1px solid #e2e8f0; padding: 15px 18px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: background-color 0.2s; }
+        .user-order-left { flex: 1; display: flex; align-items: center; gap: 15px; }
+        .checkbox-paid { width: 22px; height: 22px; cursor: pointer; flex-shrink: 0; }
+        .user-order-info { flex: 1; }
+        .user-order-name { font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 4px; }
+        .user-order-items { color: #475569; font-size: 14px; line-height: 1.5; }
+        .user-order-right { display: flex; gap: 8px; align-items: center; margin-left: 15px; }
+        
+        .btn-action-edit { background: #fef9c3; color: #a16207; padding: 6px 12px; font-size: 13px; border-radius: 6px; }
+        .btn-action-edit:hover { background: #fef08a; }
+        .btn-action-delete { background: #fee2e2; color: #b91c1c; padding: 6px 12px; font-size: 13px; border-radius: 6px; }
+        .btn-action-delete:hover { background: #fecaca; }
+
+        .card-paid { background-color: #f0fdf4; border-color: #bbf7d0; color: #94a3b8; }
+        .card-paid .user-order-items { text-decoration: line-through; color: #94a3b8; }
+        .card-paid .user-order-name { color: #94a3b8; }
+        
+        /* 達標標籤提示 */
+        .reached-badge { background-color: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 6px; font-size: 13px; font-weight: bold; margin-left: 10px; }
+        .not-reached-badge { background-color: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 6px; font-size: 13px; font-weight: bold; margin-left: 10px; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen py-8">
+<body>
 
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-6">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-indigo-600 mb-2">🎉 揪團點餐趣</h1>
-            <p class="text-gray-500">多裝置即時同步點單系統</p>
+    <div id="page-main" class="page active">
+        <div class="header">
+            <h2>🛒 揪團代購趣 - 主頁面</h2>
+            <button class="btn-add" onclick="openGroupModal()">➕ 發起新團購</button>
+        </div>
+        <div class="grid-container" id="group-grid"></div>
+    </div>
+
+    <div id="group-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>📢 發起新團購項目</h3>
+            <label><b>團購標題（必填）</b></label>
+            <input type="text" id="new-group-title" placeholder="例如：日本生吐司團...">
+            
+            <label><b>詳細內容描述</b></label>
+            <textarea id="new-group-desc" rows="3" placeholder="例如：每人限購兩組、收單時間..."></textarea>
+            
+            <label><b>參考網址（選填）</b></label>
+            <input type="url" id="new-group-link" placeholder="https://...">
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeGroupModal()">取消</button>
+                <button class="btn-add" onclick="submitNewGroup()">確認建立</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-detail" class="page">
+        <div class="header">
+            <button class="btn-back" onclick="goBackToMain()">⬅️ 返回主頁</button>
+            <h2 id="detail-title">團購名稱</h2>
         </div>
 
-        <div id="group-setup" class="space-y-4">
-            <div class="bg-indigo-50 p-4 rounded-lg">
-                <h2 class="font-semibold text-indigo-900 mb-2">開新團：</h2>
-                <button id="btn-create-group" class="w-full bg-indigo-600 hov:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition duration-200">
-                    ➕ 點我發起一個新團購
-                </button>
+        <div class="info-box">
+            <p id="detail-desc">這裡顯示描述內容</p>
+            <a id="detail-link" class="link-tag" href="#" target="_blank">🔗 參考網址連結</a>
+        </div>
+
+        <div class="tab-container">
+            <div id="tab-order" class="tab active" onclick="switchSubPage('order')">🥤 點餐下單面板</div>
+            <div id="tab-stats" class="tab" onclick="switchSubPage('stats')">💰 帳務與繳費狀態</div>
+        </div>
+
+        <div id="sub-page-order" class="sub-page active">
+            <button class="plus-floating-btn" onclick="openOrderModal()">➕ 填寫我的登記品項</button>
+            
+            <h3>📦 本團品項大統整（打電話下單看這裡 👇）</h3>
+            <div class="summary-box" id="order-items-summary">
+                <div style="color: #64748b;">目前尚無人登記品項喔！</div>
+            </div>
+
+            <h3>📋 誰點了什麼（編輯與修改）</h3>
+            <div id="order-list-for-edit">
+                <div style="color: #64748b; padding: 10px;">目前尚無詳細登記資料</div>
+            </div>
+        </div>
+
+        <div id="sub-page-stats" class="sub-page">
+            <div class="discount-control-box">
+                <h4 style="margin: 0 0 6px 0; color: #b45309;">⚙️ 請選擇本團的促銷優惠方式：</h4>
+                <div class="discount-row">
+                    <select id="promo-main-selector" onchange="handlePromoSelectChange()">
+                        <option value="none">❌ 本團無 any 促銷優惠</option>
+                        <option value="buyx">🎁 全團混湊 買 X 送 Y (支援多組倍數自動計算)</option>
+                        <option value="rate">📉 全團總額打折</option>
+                        <option value="minus">💵 全團滿額折現</option>
+                    </select>
+
+                    <div id="group-buyx" class="promo-input-group">
+                        <span>全團每滿</span>
+                        <input type="number" id="promo-buy-x" placeholder="6" min="1" oninput="reCalcAndRender()">
+                        <span>件，就送</span>
+                        <input type="number" id="promo-give-y" placeholder="1" min="1" oninput="reCalcAndRender()">
+                        <span>件(免單)</span>
+                        <span id="promo-buyx-badge"></span>
+                    </div>
+
+                    <div id="group-rate" class="promo-input-group">
+                        <span>請輸入折數：打</span>
+                        <input type="number" id="promo-global-rate" placeholder="9" step="0.1" min="0" max="100" oninput="reCalcAndRender()">
+                        <span>折</span>
+                    </div>
+
+                    <div id="group-minus" class="promo-input-group">
+                        <span>全團總額滿</span>
+                        <input type="number" id="promo-target-condition" placeholder="1000" min="0" oninput="reCalcAndRender()">
+                        <span>元，直接折抵</span>
+                        <input type="number" id="promo-global-minus" placeholder="100" min="0" oninput="reCalcAndRender()">
+                        <span>元</span>
+                        <span id="promo-status-badge"></span>
+                    </div>
+                </div>
+            </div>
+
+            <h3>📊 本團帳務大總計</h3>
+            <div class="stats-banner">
+                <div>原本總計：<span id="stat-raw-money" style="color:#64748b; text-decoration:line-through;">$0</span></div>
+                <div>目前總訂購件數：<span id="stat-total-qty" style="color:var(--primary)">0</span> 件</div>
+                <div>折扣後應付總金額：<span id="stat-total-money" class="total-money">$0</span></div>
+            </div>
+
+            <h3>👥 團員繳費狀態管理（點擊勾選框確認收錢）</h3>
+            <div id="order-list-for-pay">
+                <div style="color: #64748b; padding: 10px;">目前尚無詳細登記資料</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="order-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="order-modal-title">✍️ 登記你的品項</h3>
+            <label><b>你的名字</b></label>
+            <input type="text" id="order-name" placeholder="例如：王小明">
+            
+            <div style="display: flex; gap: 8px; color: #64748b; font-size: 14px; font-weight: bold; margin-bottom: 2px;">
+                <span style="flex: 2.5;">品項名稱</span>
+                <span style="flex: 1.2;">原價單價($)</span>
+                <span style="flex: 1; text-align: center;">數量</span>
             </div>
             
-            <div class="text-center text-gray-400 font-bold my-2">─ OR ─</div>
-
-            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h2 class="font-semibold text-gray-700 mb-2">加入既有的團：</h2>
-                <p class="text-sm text-gray-500 mb-2">請直接使用主揪分享給你的專屬網址，或是輸入下方房間 ID：</p>
-                <div class="flex gap-2">
-                    <input type="text" id="input-group-id" placeholder="請輸入房間 ID" class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <button id="btn-join-group" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                        進入
-                    </button>
+            <div id="dynamic-items-container">
+                <div class="item-input-row">
+                    <input type="text" class="input-item-name" placeholder="如：大杯珍奶">
+                    <input type="number" class="input-item-price" placeholder="單價">
+                    <input type="number" class="input-item-qty" value="1" min="1" placeholder="數量">
                 </div>
+            </div>
+
+            <button type="button" class="btn-more-item" onclick="addNewItemRow()">➕ 我還要再點一項...</button>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeOrderModal()">取消</button>
+                <button class="btn-add" id="btn-order-submit" style="background-color: var(--primary);" onclick="submitNewOrder()">確認送出</button>
             </div>
         </div>
-
-        <div id="main-order-panel" class="hidden space-y-6">
-            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg flex justify-between items-center">
-                <div>
-                    <p class="text-sm text-yellow-700">目前房間 ID：<span id="current-room-id" class="font-mono font-bold"></span></p>
-                    <p class="text-xs text-gray-500 mt-1">💡 複製瀏覽器網址傳給朋友，大家就能一起點餐！</p>
-                </div>
-                <button id="btn-copy-link" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-2 rounded">
-                    📋 複製網址
-                </button>
-            </div>
-
-            <div class="bg-white p-4 border rounded-lg shadow-sm">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">✍️ 我要點餐</h2>
-                <form id="order-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">你的名字</label>
-                        <input type="text" id="user-name" required placeholder="例如：小明" class="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">品項 / 甜度 / 冰塊</label>
-                        <input type="text" id="item-details" required placeholder="例如：紅茶拿鐵 微糖微冰" class="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200">
-                        🚀 送出點單（全部裝置同步更新）
-                    </button>
-                </form>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-lg border">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-800">🛒 目前已點餐點 (<span id="total-count">0</span>)</h2>
-                    <button id="btn-back-to-main" class="text-xs text-gray-500 hover:text-indigo-600 underline">返回首頁</button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">名字</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">餐點內容</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
-                            </tr>
-                        }
-                        </thead>
-                        <tbody id="order-list" class="bg-white divide-y divide-gray-200 text-sm">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
     </div>
 
     <script type="module">
-        // 引入 Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            onSnapshot, 
-            doc, 
-            deleteDoc, 
-            updateDoc 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        // 🟢 2026年修正版：精確對準你擁有的 test-groupbuying 雲端資料庫
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        
+        // 🟢 修正點：對準你目前實際擁有的資料庫
         const firebaseConfig = {
             apiKey: "AIzaSyD-1_N8v_3vXvP8R1x5T_Z7m9bQ4vW2k0A",
             authDomain: "test-groupbuying.firebaseapp.com",
@@ -114,167 +253,421 @@
             appId: "1:582049184729:web:a1b2c3d4e5f6g7h8i9j0"
         };
 
-        // 初始化 Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        let currentGroupId = null;
-        let globalOrdersCache = [];
-        let unsubscribeOrders = null;
+        let currentGroupId = null; 
+        let ordersListener = null;
+        let globalOrdersCache = []; 
+        let editingName = null;     
 
-        // 亂數產生隨機房間 ID 函數
-        function generateGroupId() {
-            return Math.random().toString(36).substring(2, 8).toUpperCase();
-        }
-
-        // --- 介面元素獲取 ---
-        const groupSetup = document.getElementById('group-setup');
-        const mainOrderPanel = document.getElementById('main-order-panel');
-        const currentRoomIdDisplay = document.getElementById('current-room-id');
-        const orderListElement = document.getElementById('order-list');
-        const totalCountDisplay = document.getElementById('total-count');
-
-        // --- 初始化確認：檢查網址裡有沒有帶房間 ID ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlGroupId = urlParams.get('room');
-        if (urlGroupId) {
-            enterRoom(urlGroupId);
-        }
-
-        // --- 事件綁定：發起新團購 ---
-        document.getElementById('btn-create-group').addEventListener('click', () => {
-            const newRoomId = generateGroupId();
-            // 修改網址列，加上房間參數，方便分享
-            window.history.pushState({}, '', `?room=${newRoomId}`);
-            enterRoom(newRoomId);
-        });
-
-        // --- 事件綁定：輸入 ID 加入團購 ---
-        document.getElementById('btn-join-group').addEventListener('click', () => {
-            const inputId = document.getElementById('input-group-id').value.trim().toUpperCase();
-            if (inputId) {
-                window.history.pushState({}, '', `?room=${inputId}`);
-                enterRoom(inputId);
-            } else {
-                alert('請輸入正確的房間 ID！');
-            }
-        });
-
-        // --- 進入房間並開啟即時監聽核心 ---
-        function enterRoom(groupId) {
-            currentGroupId = groupId;
-            
-            // 切換介面顯示
-            groupSetup.classList.add('hidden');
-            mainOrderPanel.classList.remove('hidden');
-            currentRoomIdDisplay.textContent = currentGroupId;
-
-            // 如果本來就有在監聽別的房間，先斷開
-            if (unsubscribeOrders) unsubscribeOrders();
-
-            // 🔥 核心：即時監聽雲端資料庫該房間底下的訂單 (onSnapshot)
-            const ordersRef = collection(db, "groups", currentGroupId, "orders");
-            unsubscribeOrders = onSnapshot(ordersRef, (snapshot) => {
-                globalOrdersCache = [];
-                snapshot.forEach((doc) => {
-                    globalOrdersCache.push({ id: doc.id, ...doc.data() });
-                });
-                // 收到新資料，立刻重新渲染畫面
-                renderOrders(globalOrdersCache);
-            }, (error) => {
-                console.error("資料庫連線失敗:", error);
-                alert("無法同步雲端資料庫，請檢查 Firebase 中的 Firestore Rules 權限是否開啟！");
-            });
-        }
-
-        // --- 事件綁定：送出點單 ---
-        document.getElementById('order-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nameInput = document.getElementById('user-name');
-            const itemInput = document.getElementById('item-details');
-
-            if (!currentGroupId) return;
-
-            try {
-                // 將資料新增到該房間的雲端集合中
-                await addDoc(collection(db, "groups", currentGroupId, "orders"), {
-                    name: nameInput.value.trim(),
-                    item: itemInput.value.trim(),
-                    timestamp: Date.now()
-                });
-                
-                // 清空餐點輸入框（名字保留方便連續點餐）
-                itemInput.value = '';
-                itemInput.focus();
-            } catch (error) {
-                console.error("送出餐點失敗:", error);
-                alert("送出失敗！可能是 Firebase 資料庫的 Rules 被鎖住了！");
-            }
-        });
-
-        // --- 畫面渲染函數 ---
-        function renderOrders(orders) {
-            // 按照時間排序，先點的在上面
-            orders.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-            
-            orderListElement.innerHTML = '';
-            totalCountDisplay.textContent = orders.length;
-
-            if (orders.length === 0) {
-                orderListElement.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-400">目前還沒有人點餐，快當第一個吧！</td></tr>`;
-                return;
-            }
-
-            orders.forEach(order => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="px-4 py-3 font-medium text-gray-900">${escapeHtml(order.name)}</td>
-                    <td class="px-4 py-3 text-gray-700">${escapeHtml(order.item)}</td>
-                    <td class="px-4 py-3 text-right">
-                        <button class="text-red-500 hover:text-red-700 text-xs font-semibold btn-delete" data-id="${order.id}">❌ 刪除</button>
-                    </td>
+        // --- 1. 即時監聽主頁面 ---
+        onSnapshot(collection(db, "groups"), (snapshot) => {
+            const grid = document.getElementById('group-grid');
+            grid.innerHTML = ''; 
+            snapshot.forEach((doc) => {
+                const group = doc.data();
+                const card = document.createElement('div');
+                card.className = 'group-card';
+                card.onclick = function() { goToDetail(doc.id, group.title, group.desc, group.link); };
+                card.innerHTML = `
+                    <button class="btn-delete-card" onclick="deleteGroupFromFirebase('${doc.id}', '${group.title}', event)">🗑️</button>
+                    <h3>${group.title}</h3>
+                    <p>📝 說明：${group.desc || '無'}</p>
+                    ${group.link ? `<a class="link-tag" href="${group.link}" target="_blank" onclick="event.stopPropagation();">🔗 查看參考網址</a>` : ''}
                 `;
-                orderListElement.appendChild(tr);
+                grid.appendChild(card);
+            });
+        });
+
+        // --- 2. 新增與刪除團購 ---
+        window.openGroupModal = function() { document.getElementById('group-modal').classList.add('active'); }
+        window.closeGroupModal = function() { document.getElementById('group-modal').classList.remove('active'); }
+        window.submitNewGroup = async function() {
+            let title = document.getElementById('new-group-title').value.trim();
+            let desc = document.getElementById('new-group-desc').value.trim();
+            let link = document.getElementById('new-group-link').value.trim();
+            if(!title) { alert("請輸入團購標題！"); return; }
+            closeGroupModal();
+            try { await addDoc(collection(db, "groups"), { title, desc, link }); } catch (error) { console.error(error); }
+            document.getElementById('new-group-title').value = '';
+            document.getElementById('new-group-desc').value = '';
+            document.getElementById('new-group-link').value = '';
+        }
+        window.deleteGroupFromFirebase = async function(id, title, event) {
+            event.stopPropagation();
+            if (confirm(`確定要刪除「${title}」嗎？\n(注意：所有資料會同步刪除)`)) { await deleteDoc(doc(db, "groups", id)); }
+        }
+
+        // --- 3. 詳情頁控制 ---
+        window.goToDetail = function(groupId, title, desc, link) {
+            currentGroupId = groupId;
+            document.getElementById('page-main').classList.remove('active');
+            document.getElementById('page-detail').classList.add('active');
+            document.getElementById('detail-title').innerText = title;
+            document.getElementById('detail-desc').innerText = "📝 團購說明：" + (desc || "無描述");
+            
+            document.getElementById('promo-main-selector').value = 'none';
+            document.getElementById('promo-buy-x').value = '';
+            document.getElementById('promo-give-y').value = '';
+            document.getElementById('promo-global-rate').value = '';
+            document.getElementById('promo-target-condition').value = '';
+            document.getElementById('promo-global-minus').value = '';
+            handlePromoSelectChange(); 
+
+            const linkElement = document.getElementById('detail-link');
+            if(link) { linkElement.href = link; linkElement.style.display = "inline-block"; } else { linkElement.style.display = "none"; }
+
+            if(ordersListener) ordersListener();
+            ordersListener = onSnapshot(collection(db, "groups", groupId, "orders"), (snapshot) => {
+                let orders = [];
+                snapshot.forEach(d => { orders.push({ id: d.id, ...d.data() }); });
+                globalOrdersCache = orders; 
+                renderOrders(orders);
+            });
+        }
+        window.goBackToMain = function() {
+            if(ordersListener) ordersListener();
+            document.getElementById('page-detail').classList.remove('active');
+            document.getElementById('page-main').classList.add('active');
+        }
+
+        // --- 4. 登記填寫品項動態控制 ---
+        window.openOrderModal = function() { 
+            editingName = null;
+            document.getElementById('order-modal-title').innerText = "✍️ 登記你的品項";
+            document.getElementById('order-name').disabled = false;
+            document.getElementById('btn-order-submit').setAttribute("onclick", "submitNewOrder()");
+            document.getElementById('order-modal').classList.add('active');
+        }
+        
+        window.closeOrderModal = function() { 
+            document.getElementById('order-modal').classList.remove('active');
+            resetOrderModalRows(); 
+        }
+        window.addNewItemRow = function() {
+            const container = document.getElementById('dynamic-items-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'item-input-row';
+            newRow.innerHTML = `
+                <input type="text" class="input-item-name" placeholder="品項名稱">
+                <input type="number" class="input-item-price" placeholder="單價">
+                <input type="number" class="input-item-qty" value="1" min="1" placeholder="數量">
+            `;
+            container.appendChild(newRow);
+        }
+        function resetOrderModalRows() {
+            document.getElementById('order-name').value = '';
+            document.getElementById('dynamic-items-container').innerHTML = `
+                <div class="item-input-row">
+                    <input type="text" class="input-item-name" placeholder="如：大杯珍奶">
+                    <input type="number" class="input-item-price" placeholder="單價">
+                    <input type="number" class="input-item-qty" value="1" min="1" placeholder="數量">
+                </div>
+            `;
+        }
+        
+        window.submitNewOrder = async function() {
+            let name = document.getElementById('order-name').value.trim();
+            if(!name) { alert("請輸入你的名字！"); return; }
+
+            const itemNames = document.querySelectorAll('.input-item-name');
+            const itemPrices = document.querySelectorAll('.input-item-price');
+            const itemQtys = document.querySelectorAll('.input-item-qty');
+
+            let validOrders = [];
+            for(let i = 0; i < itemNames.length; i++) {
+                let item = itemNames[i].value.trim();
+                let price = parseInt(itemPrices[i].value);
+                let qty = parseInt(itemQtys[i].value) || 1;
+                if (item && !isNaN(price)) {
+                    validOrders.push({ name, item, qty, price: price, paid: false });
+                }
+            }
+
+            if(validOrders.length === 0) { alert("請至少正確填寫一組品項與單價喔！"); return; }
+            closeOrderModal();
+            const promises = validOrders.map(order => addDoc(collection(db, "groups", currentGroupId, "orders"), order));
+            await Promise.all(promises);
+            resetOrderModalRows();
+        }
+
+        window.openEditOrderModal = function(name) {
+            editingName = name;
+            document.getElementById('order-modal-title').innerText = `✏️ 修改 ${name} 的登記品項`;
+            const nameInput = document.getElementById('order-name');
+            nameInput.value = name;
+            nameInput.disabled = true;
+            const userOrders = globalOrdersCache.filter(o => o.name === name);
+            const container = document.getElementById('dynamic-items-container');
+            container.innerHTML = '';
+            userOrders.forEach(o => {
+                const row = document.createElement('div');
+                row.className = 'item-input-row';
+                row.innerHTML = `
+                    <input type="text" class="input-item-name" value="${o.item}" placeholder="品項名稱">
+                    <input type="number" class="input-item-price" value="${o.price}" placeholder="單價">
+                    <input type="number" class="input-item-qty" value="${o.qty}" min="1" placeholder="數量">
+                `;
+                container.appendChild(row);
+            });
+            document.getElementById('btn-order-submit').setAttribute("onclick", "submitEditOrder()");
+            document.getElementById('order-modal').classList.add('active');
+        }
+
+        window.submitEditOrder = async function() {
+            const itemNames = document.querySelectorAll('.input-item-name');
+            const itemPrices = document.querySelectorAll('.input-item-price');
+            const itemQtys = document.querySelectorAll('.input-item-qty');
+
+            let newItems = [];
+            for(let i = 0; i < itemNames.length; i++) {
+                let item = itemNames[i].value.trim();
+                let price = parseInt(itemPrices[i].value);
+                let qty = parseInt(itemQtys[i].value) || 1;
+                if (item && !isNaN(price)) {
+                    newItems.push({ name: editingName, item, qty, price: price, paid: false });
+                }
+            }
+
+            if(newItems.length === 0) { alert("請至少保留一組有效的品項與單價喔！"); return; }
+            closeOrderModal();
+            const oldUserOrders = globalOrdersCache.filter(o => o.name === editingName);
+            const promises = [];
+            for (let i = 0; i < Math.max(oldUserOrders.length, newItems.length); i++) {
+                if (i < oldUserOrders.length && i < newItems.length) {
+                    const docRef = doc(db, "groups", currentGroupId, "orders", oldUserOrders[i].id);
+                    promises.push(updateDoc(docRef, newItems[i]));
+                } else if (i < newItems.length) {
+                    const colRef = collection(db, "groups", currentGroupId, "orders");
+                    promises.push(addDoc(colRef, newItems[i]));
+                } else if (i < oldUserOrders.length) {
+                    const docRef = doc(db, "groups", currentGroupId, "orders", oldUserOrders[i].id);
+                    promises.push(deleteDoc(docRef));
+                }
+            }
+            await Promise.all(promises);
+            resetOrderModalRows();
+        }
+
+        window.deleteUserWholeOrder = async function(name) {
+            if (confirm(`確定要刪除「${name}」的所有登記品項嗎？`)) {
+                const userOrders = globalOrdersCache.filter(o => o.name === name);
+                const deletePromises = userOrders.map(o => deleteDoc(doc(db, "groups", currentGroupId, "orders", o.id)));
+                await Promise.all(deletePromises);
+            }
+        }
+
+        window.toggleUserAllPaid = async function(orderIds, currentAllPaidStatus) {
+            const targetStatus = !currentAllPaidStatus;
+            const promises = orderIds.map(id => updateDoc(doc(db, "groups", currentGroupId, "orders", id), { paid: targetStatus }));
+            await Promise.all(promises);
+        }
+
+        window.handlePromoSelectChange = function() {
+            const selectedMode = document.getElementById('promo-main-selector').value;
+            document.querySelectorAll('.promo-input-group').forEach(el => el.classList.remove('active'));
+            if (selectedMode === 'buyx') {
+                document.getElementById('group-buyx').classList.add('active');
+            } else if (selectedMode === 'rate') {
+                document.getElementById('group-rate').classList.add('active');
+            } else if (selectedMode === 'minus') {
+                document.getElementById('group-minus').classList.add('active');
+            }
+            reCalcAndRender();
+        }
+
+        window.reCalcAndRender = function() { renderOrders(globalOrdersCache); }
+
+        function renderOrders(orders) {
+            let globalItemSummary = {};
+            let totalQty = 0;      
+            let rawTotalMoney = 0; 
+
+            orders.forEach(o => {
+                let itemName = o.item.trim();
+                if(!globalItemSummary[itemName]) globalItemSummary[itemName] = 0;
+                globalItemSummary[itemName] += o.qty; 
+                totalQty += o.qty;
+                rawTotalMoney += (o.price * o.qty);
             });
 
-            // 綁定刪除按鍵事件
-            document.querySelectorAll('.btn-delete').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const orderId = e.target.getAttribute('data-id');
-                    if (confirm('確定要刪除這筆餐點嗎？')) {
-                        try {
-                            await deleteDoc(doc(db, "groups", currentGroupId, "orders", orderId));
-                        } catch (err) {
-                            alert('刪除失敗，無此權限！');
-                        }
-                    }
+            const summaryBox = document.getElementById('order-items-summary');
+            if(orders.length === 0) {
+                summaryBox.innerHTML = '<div style="color: #64748b;">目前尚無人登記品項喔！</div>';
+            } else {
+                summaryBox.innerHTML = Object.keys(globalItemSummary).map(itemName => {
+                    return `<div class="summary-item">🥤 <b>${itemName}</b> ─── 共 <span style="color:var(--primary); font-size:18px; font-weight:bold;">${globalItemSummary[itemName]}</span> 份</div>`;
+                }).join('');
+            }
+
+            const currentPromoMode = document.getElementById('promo-main-selector').value;
+            let isBuyXPromoTriggered = false;
+            let totalFreeValueToDistribute = 0; 
+            let totalFreeQty = 0; 
+
+            let buyX = parseInt(document.getElementById('promo-buy-x').value);
+            let giveY = parseInt(document.getElementById('promo-give-y').value);
+            const buyxBadge = document.getElementById('promo-buyx-badge');
+            if(buyxBadge) buyxBadge.innerHTML = '';
+
+            if (currentPromoMode === 'buyx' && !isNaN(buyX) && buyX > 0 && !isNaN(giveY) && giveY > 0) {
+                let multiplier = Math.floor(totalQty / buyX);
+                totalFreeQty = multiplier * giveY;
+                if (totalFreeQty > 0) {
+                    isBuyXPromoTriggered = true;
+                    let averageUnitPrice = rawTotalMoney / totalQty;
+                    totalFreeValueToDistribute = totalFreeQty * averageUnitPrice;
+                    if(buyxBadge) { buyxBadge.innerHTML = `<span class="reached-badge">🎉 全團共 ${totalQty} 件 ── 自動觸發免單 ${totalFreeQty} 件！已按比例公平拆分</span>`; }
+                } else {
+                    if(buyxBadge) { buyxBadge.innerHTML = `<span class="not-reached-badge">⚠️ 目前全團共 ${totalQty} 件，還差 ${buyX - (totalQty % buyX)} 件即可觸發下一階優惠</span>`; }
+                }
+            }
+
+            let mergedData = {};
+            orders.forEach(o => {
+                let itemRawTotalPrice = o.price * o.qty; 
+                if (!mergedData[o.name]) {
+                    mergedData[o.name] = { itemsInfo: [], userTotalQty: 0, rawSubTotal: 0, finalPrice: 0, allPaid: true, orderIds: [] };
+                }
+                mergedData[o.name].itemsInfo.push(`${o.item} x${o.qty}`);
+                mergedData[o.name].userTotalQty += o.qty;
+                mergedData[o.name].rawSubTotal += itemRawTotalPrice;
+                mergedData[o.name].orderIds.push(o.id);
+                if (!o.paid) { mergedData[o.name].allPaid = false; }
+            });
+
+            let finalGlobalTotalMoney = rawTotalMoney;
+            if (currentPromoMode === 'buyx' && isBuyXPromoTriggered && totalQty > 0) {
+                finalGlobalTotalMoney = Math.max(0, rawTotalMoney - totalFreeValueToDistribute);
+                Object.keys(mergedData).forEach(name => {
+                    let user = mergedData[name];
+                    let userDiscountShare = totalFreeValueToDistribute * (user.userTotalQty / totalQty);
+                    user.finalPrice = Math.max(0, Math.round(user.rawSubTotal - userDiscountShare));
                 });
-            });
+            } else if (currentPromoMode === 'rate') {
+                let rawInputRate = parseFloat(document.getElementById('promo-global-rate').value);
+                let calculatedRate = 1.0;
+                if (!isNaN(rawInputRate) && rawInputRate > 0) {
+                    if (rawInputRate >= 1 && rawInputRate <= 9.9) { calculatedRate = rawInputRate / 10; }
+                    else if (rawInputRate >= 10 && rawInputRate <= 99) { calculatedRate = rawInputRate / 100; }
+                    else if (rawInputRate < 1) { calculatedRate = rawInputRate; }
+                }
+                finalGlobalTotalMoney = rawTotalMoney * calculatedRate;
+                Object.keys(mergedData).forEach(name => {
+                    let user = mergedData[name];
+                    user.finalPrice = Math.round(user.rawSubTotal * calculatedRate);
+                });
+            } else if (currentPromoMode === 'minus') {
+                let targetCondition = parseFloat(document.getElementById('promo-target-condition').value);
+                let globalMinus = parseFloat(document.getElementById('promo-global-minus').value);
+                const badge = document.getElementById('promo-status-badge');
+                let isMinusTriggered = false;
+
+                if (!isNaN(targetCondition) && !isNaN(globalMinus) && targetCondition > 0 && globalMinus > 0) {
+                    if (rawTotalMoney >= targetCondition) {
+                        finalGlobalTotalMoney = Math.max(0, rawTotalMoney - globalMinus);
+                        isMinusTriggered = true;
+                        badge.innerHTML = `<span class="reached-badge">🎉 已達滿額門檻！已按個人金額比例折抵</span>`;
+                    } else {
+                        let gap = Math.round(targetCondition - rawTotalMoney);
+                        badge.innerHTML = `<span class="not-reached-badge">⚠️ 還差 $${gap} 元達標金額折抵</span>`;
+                    }
+                } else { if(badge) badge.innerHTML = ''; }
+
+                Object.keys(mergedData).forEach(name => {
+                    let user = mergedData[name];
+                    if (isMinusTriggered && rawTotalMoney > 0) {
+                        let userDiscountShare = globalMinus * (user.rawSubTotal / rawTotalMoney);
+                        user.finalPrice = Math.round(user.rawSubTotal - userDiscountShare);
+                    } else { user.finalPrice = user.rawSubTotal; }
+                });
+            } else {
+                Object.keys(mergedData).forEach(name => {
+                    let user = mergedData[name];
+                    user.finalPrice = user.rawSubTotal;
+                });
+            }
+
+            let checkSum = 0;
+            Object.keys(mergedData).forEach(name => { checkSum += mergedData[name].finalPrice; });
+            let diff = Math.round(finalGlobalTotalMoney) - checkSum;
+            if (diff !== 0 && Object.keys(mergedData).length > 0) {
+                let firstKey = Object.keys(mergedData)[0];
+                mergedData[firstKey].finalPrice += diff;
+            }
+
+            document.getElementById('stat-raw-money').innerText = `$${Math.round(rawTotalMoney)}`;
+            document.getElementById('stat-total-qty').innerText = totalQty;
+            document.getElementById('stat-total-money').innerText = `$${Math.round(finalGlobalTotalMoney)}`;
+
+            // ─── 【呈現 1】：點餐修改面板 ───
+            const editContainer = document.getElementById('order-list-for-edit');
+            if(orders.length === 0) {
+                editContainer.innerHTML = '<div style="color: #64748b; padding: 10px;">目前尚無詳細登記資料</div>';
+            } else {
+                editContainer.innerHTML = Object.keys(mergedData).map(name => {
+                    const user = mergedData[name];
+                    const plainItems = orders.filter(o => o.name === name).map(o => `${o.item} x${o.qty}`).join(' ｜ ');
+                    return `
+                        <div class="user-order-card">
+                            <div class="user-order-left">
+                                <div class="user-order-info">
+                                    <div class="user-order-name">👤 ${name} <span style="font-size:13px; color:#64748b; font-weight:normal;">(原價總計: $${user.rawSubTotal}，共 ${user.userTotalQty} 件)</span></div>
+                                    <div class="user-order-items">${plainItems}</div>
+                                </div>
+                            </div>
+                            <div class="user-order-right">
+                                <button class="btn-action-edit" onclick="openEditOrderModal('${name}')">✏️ 修改</button>
+                                <button class="btn-action-delete" onclick="deleteUserWholeOrder('${name}')">🗑️ 刪除</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // ─── 【呈現 2】：帳務繳費分頁 ───
+            const payContainer = document.getElementById('order-list-for-pay');
+            if(orders.length === 0) {
+                payContainer.innerHTML = '<div style="color: #64748b; padding: 10px;">目前尚無詳細登記資料</div>';
+            } else {
+                payContainer.innerHTML = Object.keys(mergedData).map(name => {
+                    const user = mergedData[name];
+                    const itemsHtml = user.itemsInfo.join(' ｜ ');
+                    const idsParam = JSON.stringify(user.orderIds);
+                    let realSaved = user.rawSubTotal - user.finalPrice;
+                    let savedText = realSaved > 0 ? ` (已省$${realSaved})` : '';
+                    return `
+                        <div class="user-order-card ${user.allPaid ? 'card-paid' : ''}">
+                            <div class="user-order-left">
+                                <input type="checkbox" class="checkbox-paid" ${user.allPaid ? 'checked' : ''} onclick='toggleUserAllPaid(${idsParam}, ${user.allPaid})'>
+                                <div class="user-order-info">
+                                    <div class="user-order-name">👤 ${name} 
+                                        <span style="font-size:16px; color:var(--danger); margin-left:8px; font-weight:bold;">應付: $${user.finalPrice}</span>
+                                        <span style="font-size:12px; color:#94a3b8; font-weight:normal; text-decoration:line-through; margin-left:5px;">(原價$${user.rawSubTotal})</span>
+                                        <span style="font-size:12px; color:var(--success); font-weight:bold; margin-left:4px;">${savedText}</span>
+                                        ${user.allPaid ? ' (🟢 已收款)' : ' (🔴 未交錢)'}
+                                    </div>
+                                    <div class="user-order-items" style="font-size:12px;">${itemsHtml}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
         }
 
-        // --- 工具：防止 XSS 注入攻擊的安全防護 ---
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        window.switchSubPage = function(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
+            if(type === 'order') {
+                document.getElementById('tab-order').classList.add('active');
+                document.getElementById('sub-page-order').classList.add('active');
+            } else {
+                document.getElementById('tab-stats').classList.add('active');
+                document.getElementById('sub-page-stats').classList.add('active');
+            }
         }
-
-        // --- 工具：複製網址功能 ---
-        document.getElementById('btn-copy-link').addEventListener('click', () => {
-            navigator.clipboard.writeText(window.location.href).then(() => {
-                alert('📋 團購網址已成功複製！快發給朋友一起點！');
-            }).catch(() => {
-                alert('複製失敗，請手動複製瀏覽器網址列。');
-            });
-        });
-
-        // --- 工具：返回首頁清空房間 ---
-        document.getElementById('btn-back-to-main').addEventListener('click', () => {
-            if (unsubscribeOrders) unsubscribeOrders();
-            window.history.pushState({}, '', window.location.pathname);
-            currentGroupId = null;
-            groupSetup.classList.remove('hidden');
-            mainOrderPanel.classList.add('hidden');
-        });
     </script>
 </body>
 </html>
