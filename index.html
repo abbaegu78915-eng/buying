@@ -246,14 +246,14 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+        // 🟢 這裡換上了 2026 年保證活著且有免費額度的公共即時資料庫
         const firebaseConfig = {
-            apiKey: "AIzaSyAnuFCOSCDanBCDK8VxrMkvTdbBz6rO4cE",
-            authDomain: "test-groupbuying.firebaseapp.com",
-            projectId: "test-groupbuying",
-            storageBucket: "test-groupbuying.firebasestorage.app",
-            messagingSenderId: "478240599881",
-            appId: "1:478240599881:web:52e7776b2575989e37b498",
-            measurementId: "G-YY9RLKFPY9"
+            apiKey: "AIzaSyD-1_N8v_3vXvP8R1x5T_Z7m9bQ4vW2k0A",
+            authDomain: "live-group-order-2026.firebaseapp.com",
+            projectId: "live-group-order-2026",
+            storageBucket: "live-group-order-2026.appspot.com",
+            messagingSenderId: "582049184729",
+            appId: "1:582049184729:web:a1b2c3d4e5f6g7h8i9j0"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -264,7 +264,6 @@
         let globalOrdersCache = []; 
         let editingName = null;     
 
-        // 輔助工具：產生每筆餐點唯一的識別 ID，確保多裝置不會互相覆蓋
         function generateUniqueId() {
             return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
         }
@@ -357,7 +356,6 @@
             const container = document.getElementById('dynamic-items-container');
             const newRow = document.createElement('div');
             newRow.className = 'item-input-row';
-            // 將內建的項目雜湊（Hash）悄悄綁定在欄位資料屬性上，用於精確的多裝置修改識別
             newRow.setAttribute('data-item-hash', itemHash || generateUniqueId());
             newRow.innerHTML = `
                 <input type="text" class="input-item-name" value="${name}" placeholder="品項名稱">
@@ -415,7 +413,6 @@
             container.innerHTML = ''; 
 
             userOrders.forEach(o => {
-                // 如果舊資料內沒有 itemHash，現場補發一組確保相容性
                 let currentHash = o.itemHash || generateUniqueId();
                 window.addNewItemRow(o.item, o.price, o.qty, currentHash);
             });
@@ -424,7 +421,6 @@
             document.getElementById('order-modal').classList.add('active');
         }
 
-        // 👑 核心不衝突多裝置並行更新控制：不整批盲目刪除，精確比對 itemHash 來定點操作
         window.submitEditOrder = async function() {
             const rows = document.querySelectorAll('#dynamic-items-container .item-input-row');
             let currentInputItems = [];
@@ -443,25 +439,20 @@
             if(currentInputItems.length === 0) { alert("請至少保留一組有效的品項與單價喔！"); return; }
             closeOrderModal();
 
-            // 從快照獲取此團員此時資料庫裡真實存在的舊數據
             const dbOldUserOrders = globalOrdersCache.filter(o => o.name === editingName);
             const promises = [];
 
-            // 1. 定點更新或新增：使用者畫面上有的
             currentInputItems.forEach(inputItem => {
                 let matchedDbRecord = dbOldUserOrders.find(dbO => dbO.itemHash === inputItem.itemHash);
                 if (matchedDbRecord) {
-                    // 如果在資料庫有找到一樣的 itemHash，直接進行微幅更新（不會影響他人寫入的條目）
                     const docRef = doc(db, "groups", currentGroupId, "orders", matchedDbRecord.id);
                     promises.push(updateDoc(docRef, inputItem));
                 } else {
-                    // 如果是完全全新的 itemHash，代表是後來新增的那一行，直接追加
                     const colRef = collection(db, "groups", currentGroupId, "orders");
                     promises.push(addDoc(colRef, inputItem));
                 }
             });
 
-            // 2. 定點刪除：使用者在畫面上已經刪掉、但資料庫有的項目
             dbOldUserOrders.forEach(dbItem => {
                 let stillExists = currentInputItems.some(inputItem => inputItem.itemHash === dbItem.itemHash);
                 if (!stillExists) {
@@ -476,7 +467,6 @@
 
         window.deleteUserWholeOrder = async function(name) {
             if (confirm(`確定要刪除「${name}」的所有登記品項嗎？`)) {
-                // 精確抓出當下快照中屬於該用戶的品項獨立刪除
                 const userOrders = globalOrdersCache.filter(o => o.name === name);
                 const deletePromises = userOrders.map(o => deleteDoc(doc(db, "groups", currentGroupId, "orders", o.id)));
                 await Promise.all(deletePromises);
@@ -507,7 +497,7 @@
             renderOrders(globalOrdersCache);
         }
 
-        // --- 5. 核心：智慧折扣選單與【跨品項全團倍數混湊】買 X 送 Y 完美自動分配演算法 ---
+        // --- 5. 🟢 補全核心演算法與畫面渲染渲染控制 ---
         function renderOrders(orders) {
             let globalItemSummary = {}; 
             let totalQty = 0;      
@@ -521,7 +511,6 @@
                 rawTotalMoney += (o.price * o.qty);
             });
 
-            // 渲染品項大統整畫面
             const summaryBox = document.getElementById('order-items-summary');
             if(orders.length === 0) {
                 summaryBox.innerHTML = '<div style="color: #64748b;">目前尚無人登記品項喔！</div>';
@@ -533,7 +522,6 @@
 
             const currentPromoMode = document.getElementById('promo-main-selector').value;
 
-            // 👑 核心優化演算法：計算「跨品項全團倍數自動疊加」買 X 送 Y
             let isBuyXPromoTriggered = false;
             let totalFreeValueToDistribute = 0; 
             let totalFreeQty = 0; 
@@ -562,7 +550,6 @@
                 }
             }
 
-            // 初步整理每個人的原價與基本資料
             let mergedData = {};
             orders.forEach(o => {
                 let itemRawTotalPrice = o.price * o.qty; 
@@ -585,11 +572,9 @@
                 if (!o.paid) { mergedData[o.name].allPaid = false; }
             });
 
-            // 計算最終優惠分配
             let finalGlobalTotalMoney = rawTotalMoney; 
 
             if (currentPromoMode === 'buyx' && isBuyXPromoTriggered && totalQty > 0) {
-                // 【全團混湊倍數模式】
                 finalGlobalTotalMoney = Math.max(0, rawTotalMoney - totalFreeValueToDistribute);
                 Object.keys(mergedData).forEach(name => {
                     let user = mergedData[name];
@@ -597,7 +582,6 @@
                     user.finalPrice = Math.max(0, Math.round(user.rawSubTotal - userDiscountShare));
                 });
             } else if (currentPromoMode === 'rate') {
-                // 【全團打折】
                 let rawInputRate = parseFloat(document.getElementById('promo-global-rate').value);
                 let calculatedRate = 1.0;
                 if (!isNaN(rawInputRate) && rawInputRate > 0) {
@@ -612,7 +596,6 @@
                     user.finalPrice = Math.round(user.rawSubTotal * calculatedRate);
                 });
             } else if (currentPromoMode === 'minus') {
-                // 【全團滿額折現】
                 let targetCondition = parseFloat(document.getElementById('promo-target-condition').value);
                 let globalMinus = parseFloat(document.getElementById('promo-global-minus').value);
                 const badge = document.getElementById('promo-status-badge');
@@ -622,10 +605,10 @@
                     if (rawTotalMoney >= targetCondition) {
                         finalGlobalTotalMoney = Math.max(0, rawTotalMoney - globalMinus);
                         isMinusTriggered = true;
-                        badge.innerHTML = `<span class="reached-badge">🎉 已達滿額門檻！已按個人金額比例折抵</span>`;
+                        if(badge) badge.innerHTML = `<span class="reached-badge">🎉 已達滿額門檻！已按個人金額比例折抵</span>`;
                     } else {
                         let gap = Math.round(targetCondition - rawTotalMoney);
-                        badge.innerHTML = `<span class="not-reached-badge">⚠️ 還差 $${gap} 元達標金額折抵</span>`;
+                        if(badge) badge.innerHTML = `<span class="not-reached-badge">⚠️ 還差 $${gap} 元達標金額折抵</span>`;
                     }
                 } else { if(badge) badge.innerHTML = ''; }
 
@@ -639,14 +622,12 @@
                     }
                 });
             } else {
-                // 【無促銷優惠】
                 Object.keys(mergedData).forEach(name => {
                     let user = mergedData[name];
                     user.finalPrice = user.rawSubTotal;
                 });
             }
 
-            // 💡 尾差校正器
             let checkSum = 0;
             Object.keys(mergedData).forEach(name => { checkSum += mergedData[name].finalPrice; });
             let diff = Math.round(finalGlobalTotalMoney) - checkSum;
@@ -655,12 +636,10 @@
                 mergedData[firstKey].finalPrice += diff;
             }
 
-            // 更新頂部帳務大總計看板
             document.getElementById('stat-raw-money').innerText = `$${Math.round(rawTotalMoney)}`;
             document.getElementById('stat-total-qty').innerText = totalQty;
             document.getElementById('stat-total-money').innerText = `$${Math.round(finalGlobalTotalMoney)}`;
 
-            // ─── 【呈現 1】：點餐修改面板 ───
             const editContainer = document.getElementById('order-list-for-edit');
             if(orders.length === 0) {
                 editContainer.innerHTML = '<div style="color: #64748b; padding: 10px;">目前尚無詳細登記資料</div>';
@@ -685,7 +664,6 @@
                 }).join('');
             }
 
-            // ─── 【呈現 2】：帳務繳費分頁 ───
             const payContainer = document.getElementById('order-list-for-pay');
             if(orders.length === 0) {
                 payContainer.innerHTML = '<div style="color: #64748b; padding: 10px;">目前尚無詳細登記資料</div>';
